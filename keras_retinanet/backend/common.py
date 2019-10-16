@@ -25,8 +25,8 @@ def bbox_transform_inv(boxes, deltas, mean=None, std=None):
     The mean and std are the mean and std as applied in the generator. They are unnormalized in this function and then applied to the boxes.
 
     Args
-        boxes : np.array of shape (B, N, 4), where B is the batch size, N the number of boxes and 4 values for (x1, y1, x2, y2).
-        deltas: np.array of same shape as boxes. These deltas (d_x1, d_y1, d_x2, d_y2) are a factor of the width/height.
+        boxes : np.array of shape (B, N, 4), where B is the batch size, N the number of boxes and num_coordinates values for (x1, y1, x2, y2).
+        deltas: np.array of same shape as boxes. These deltas (d_x1, d_y1, d_x2, d_y2...) are a factor of the width/height.
         mean  : The mean value used when computing deltas (defaults to [0, 0, 0, 0]).
         std   : The standard deviation used when computing deltas (defaults to [0.2, 0.2, 0.2, 0.2]).
 
@@ -34,20 +34,29 @@ def bbox_transform_inv(boxes, deltas, mean=None, std=None):
         A np.array of the same shape as boxes, but with deltas applied to each box.
         The mean and std are used during training to normalize the regression values (networks love normalization).
     """
+    num_coordinates = 4  #len(deltas)
     if mean is None:
-        mean = [0, 0, 0, 0]
+        mean = [0] * num_coordinates
     if std is None:
-        std = [0.2, 0.2, 0.2, 0.2]
+        std = [0.2] * num_coordinates
 
     width  = boxes[:, :, 2] - boxes[:, :, 0]
     height = boxes[:, :, 3] - boxes[:, :, 1]
 
-    x1 = boxes[:, :, 0] + (deltas[:, :, 0] * std[0] + mean[0]) * width
-    y1 = boxes[:, :, 1] + (deltas[:, :, 1] * std[1] + mean[1]) * height
-    x2 = boxes[:, :, 2] + (deltas[:, :, 2] * std[2] + mean[2]) * width
-    y2 = boxes[:, :, 3] + (deltas[:, :, 3] * std[3] + mean[3]) * height
+    unstacked = []
 
-    pred_boxes = keras.backend.stack([x1, y1, x2, y2], axis=2)
+    for i in range(0, num_coordinates, 2):
+        unstacked.append(boxes[:, :, i % 4] + (deltas[:, :, i] * std[i] + mean[i]) * width)
+        unstacked.append(boxes[:, :, (i+1) % 4] + (deltas[:, :, i+1] * std[i+1] + mean[i+1]) * height)
+
+    #x1 = boxes[:, :, 0] + (deltas[:, :, 0] * std[0] + mean[0]) * width
+    #y1 = boxes[:, :, 1] + (deltas[:, :, 1] * std[1] + mean[1]) * height
+    #x2 = boxes[:, :, 2] + (deltas[:, :, 2] * std[2] + mean[2]) * width
+    #y2 = boxes[:, :, 3] + (deltas[:, :, 3] * std[3] + mean[3]) * height
+
+    #pred_boxes = keras.backend.stack([x1, y1, x2, y2], axis=2)
+
+    pred_boxes = keras.backend.stack(unstacked, axis=2)
 
     return pred_boxes
 

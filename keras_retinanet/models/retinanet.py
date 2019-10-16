@@ -162,7 +162,7 @@ def __create_pyramid_features(C3, C4, C5, feature_size=256):
     return [P3, P4, P5, P6, P7]
 
 
-def default_submodels(num_classes, num_anchors):
+def default_submodels(num_classes, num_anchors, num_regression_values):
     """ Create a list of default submodels used for object detection.
 
     The default submodels contains a regression submodel and a classification submodel.
@@ -170,12 +170,13 @@ def default_submodels(num_classes, num_anchors):
     Args
         num_classes : Number of classes to use.
         num_anchors : Number of base anchors.
+        num_regression_values: Number of regression values, or double the number of points
 
     Returns
         A list of tuple, where the first element is the name of the submodel and the second element is the submodel itself.
     """
     return [
-        ('regression', default_regression_model(4, num_anchors)),
+        ('regression', default_regression_model(num_regression_values, num_anchors)),
         ('classification', default_classification_model(num_classes, num_anchors))
     ]
 
@@ -242,6 +243,7 @@ def retinanet(
     num_anchors             = None,
     create_pyramid_features = __create_pyramid_features,
     submodels               = None,
+    num_regression_values   = 4,
     name                    = 'retinanet'
 ):
     """ Construct a RetinaNet model on top of a backbone.
@@ -254,6 +256,7 @@ def retinanet(
         num_anchors             : Number of base anchors.
         create_pyramid_features : Functor for creating pyramid features given the features C3, C4, C5 from the backbone.
         submodels               : Submodels to run on each feature map (default is regression and classification submodels).
+        num_regression_values   : Number of regression values, like 4 for a 2 point 2D bounding box
         name                    : Name of the model.
 
     Returns
@@ -271,7 +274,7 @@ def retinanet(
         num_anchors = AnchorParameters.default.num_anchors()
 
     if submodels is None:
-        submodels = default_submodels(num_classes, num_anchors)
+        submodels = default_submodels(num_classes, num_anchors, num_regression_values)
 
     C3, C4, C5 = backbone_layers
 
@@ -288,6 +291,7 @@ def retinanet_bbox(
     model                 = None,
     nms                   = True,
     class_specific_filter = True,
+    num_regression_values = 4,
     name                  = 'retinanet-bbox',
     anchor_params         = None,
     **kwargs
@@ -301,6 +305,7 @@ def retinanet_bbox(
         model                 : RetinaNet model to append bbox layers to. If None, it will create a RetinaNet model using **kwargs.
         nms                   : Whether to use non-maximum suppression for the filtering step.
         class_specific_filter : Whether to use class specific filtering or filter for the best scoring class only.
+        num_regression_values : The number of regression values, or double the number of 2d points
         name                  : Name of the model.
         anchor_params         : Struct containing anchor parameters. If None, default values are used.
         *kwargs               : Additional kwargs to pass to the minimal retinanet model.
@@ -322,7 +327,7 @@ def retinanet_bbox(
 
     # create RetinaNet model
     if model is None:
-        model = retinanet(num_anchors=anchor_params.num_anchors(), **kwargs)
+        model = retinanet(num_anchors=anchor_params.num_anchors(), num_regression_values=num_regression_values, **kwargs)
     else:
         assert_training_model(model)
 
@@ -339,7 +344,8 @@ def retinanet_bbox(
 
     # apply predicted regression to anchors
     boxes = layers.RegressBoxes(name='boxes')([anchors, regression])
-    boxes = layers.ClipBoxes(name='clipped_boxes')([model.inputs[0], boxes])
+    # For this particular application, don't clip points outside of anchor boxes
+    #boxes = layers.ClipBoxes(name='clipped_boxes')([model.inputs[0], boxes])
 
     # filter detections (apply NMS / score threshold / select top-k)
     detections = layers.FilterDetections(

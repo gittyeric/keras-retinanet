@@ -119,7 +119,7 @@ class RegressBoxes(keras.layers.Layer):
     """ Keras layer for applying regression values to boxes.
     """
 
-    def __init__(self, mean=None, std=None, *args, **kwargs):
+    def __init__(self, mean=None, std=None, num_coordinates=4, *args, **kwargs):
         """ Initializer for the RegressBoxes layer.
 
         Args
@@ -127,9 +127,9 @@ class RegressBoxes(keras.layers.Layer):
             std: The standard value of the regression values which was used for normalization.
         """
         if mean is None:
-            mean = np.array([0, 0, 0, 0])
+            mean = np.array([0] * num_coordinates)
         if std is None:
-            std = np.array([0.2, 0.2, 0.2, 0.2])
+            std = np.array([0.2] * num_coordinates)
 
         if isinstance(mean, (list, tuple)):
             mean = np.array(mean)
