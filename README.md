@@ -1,4 +1,4 @@
-# gitteric's fork notes!
+# gittyeric's fork notes!
 
 This is a fork of keras-retinanet that allow you to train a neural net that learns shapes beyond just rectangular bounding boxes.  See [this blog article](https://letsmakeit.com/?p=266) for an example of finding regression quadrilaterals instead.  The only change to the original repo is a new `--points=4` command line argument that allows you to specify the number of points to find, defaulting to the regular 4 (x1, y1, x2, y2) bounding box points.  
 
