@@ -2,7 +2,7 @@
 
 This is a fork of keras-retinanet that allow you to train a neural net that learns shapes beyond just rectangular bounding boxes.  See [this blog article](https://letsmakeit.com/?p=266) for an example of finding regression quadrilaterals instead.  The only change to the original repo is a new `--points=4` command line argument that allows you to specify the number of points to find, defaulting to the regular 4 (x1, y1, x2, y2) bounding box points.  
 
-Gotchas: Only bin/train.py has been updated to support arbitrary numbers of points, unit tests and other bin scripts have not been updated and only support bounding boxes.
+Gotchas: Only bin/train.py has been updated to support arbitrary numbers of points, unit tests and other bin scripts have not been updated and only support bounding boxes.  The CSV data source generator has been updated to dynamically find the correct number of points, so it's the only supported training data source since the rest inherently assume bounding boxes.
 
 The remainder of this readme is the original repo documentation.
 
