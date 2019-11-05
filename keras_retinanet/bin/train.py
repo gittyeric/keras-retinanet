@@ -76,7 +76,7 @@ def model_with_weights(model, weights, skip_mismatch):
 
 
 def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
-                  freeze_backbone=False, lr=1e-5, config=None):
+                  freeze_backbone=False, lr=1e-5, config=None, num_regression_values=4):
     """ Creates three models (model, training_model, prediction_model).
 
     Args
@@ -86,6 +86,7 @@ def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
         multi_gpu          : The number of GPUs to use for training.
         freeze_backbone    : If True, disables learning for the backbone.
         config             : Config parameters, None indicates the default configuration.
+        num_regression_values : Number of regression values, defaults to 4 for 2 bounding box coordinates
 
     Returns
         model            : The base model. This is also the model that is saved in snapshots.
@@ -107,14 +108,14 @@ def create_models(backbone_retinanet, num_classes, weights, multi_gpu=0,
     if multi_gpu > 1:
         from keras.utils import multi_gpu_model
         with tf.device('/cpu:0'):
-            model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
+            model = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier, num_regression_values=num_regression_values), weights=weights, skip_mismatch=True)
         training_model = multi_gpu_model(model, gpus=multi_gpu)
     else:
-        model          = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier), weights=weights, skip_mismatch=True)
+        model          = model_with_weights(backbone_retinanet(num_classes, num_anchors=num_anchors, modifier=modifier, num_regression_values=num_regression_values), weights=weights, skip_mismatch=True)
         training_model = model
 
     # make prediction model
-    prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params)
+    prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params, num_regression_values=num_regression_values)
 
     # compile model
     training_model.compile(
@@ -422,6 +423,7 @@ def parse_args(args):
     parser.add_argument('--config',           help='Path to a configuration parameters .ini file.')
     parser.add_argument('--weighted-average', help='Compute the mAP using the weighted average of precisions among classes.', action='store_true')
     parser.add_argument('--compute-val-loss', help='Compute validation loss during training', dest='compute_val_loss', action='store_true')
+    parser.add_argument('--points',           help='Number of points per row, defaults to 2', type=int, default=2)
 
     # Fit generator arguments
     parser.add_argument('--multiprocessing',  help='Use multiprocessing in fit_generator.', action='store_true')
@@ -462,7 +464,7 @@ def main(args=None):
         anchor_params    = None
         if args.config and 'anchor_parameters' in args.config:
             anchor_params = parse_anchor_parameters(args.config)
-        prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params)
+        prediction_model = retinanet_bbox(model=model, anchor_params=anchor_params, num_regression_values=args.points*2)
     else:
         weights = args.weights
         # default to imagenet if nothing else is specified
@@ -477,7 +479,8 @@ def main(args=None):
             multi_gpu=args.multi_gpu,
             freeze_backbone=args.freeze_backbone,
             lr=args.lr,
-            config=args.config
+            config=args.config,
+            num_regression_values=args.points*2
         )
 
     # print model summary

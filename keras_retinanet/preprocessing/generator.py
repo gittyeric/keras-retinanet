@@ -153,7 +153,7 @@ class Generator(keras.utils.Sequence):
         """ Filter annotations by removing those that are outside of the image bounds or whose width/height < 0.
         """
         # test all annotations
-        for index, (image, annotations) in enumerate(zip(image_group, annotations_group)):
+        """ for index, (image, annotations) in enumerate(zip(image_group, annotations_group)):
             # test x2 < x1 | y2 < y1 | x1 < 0 | y1 < 0 | x2 <= 0 | y2 <= 0 | x2 >= image.shape[1] | y2 >= image.shape[0]
             invalid_indices = np.where(
                 (annotations['bboxes'][:, 2] <= annotations['bboxes'][:, 0]) |
@@ -172,7 +172,7 @@ class Generator(keras.utils.Sequence):
                     annotations['bboxes'][invalid_indices, :]
                 ))
                 for k in annotations_group[index].keys():
-                    annotations_group[index][k] = np.delete(annotations[k], invalid_indices, axis=0)
+                    annotations_group[index][k] = np.delete(annotations[k], invalid_indices, axis=0) """
 
         return image_group, annotations_group
 
@@ -210,7 +210,7 @@ class Generator(keras.utils.Sequence):
         """ Randomly transforms image and annotation.
         """
         # randomly transform both image and annotations
-        if transform is not None or self.transform_generator:
+        """ if transform is not None or self.transform_generator:
             if transform is None:
                 transform = adjust_transform_for_image(next(self.transform_generator), image, self.transform_parameters.relative_translation)
 
@@ -220,7 +220,7 @@ class Generator(keras.utils.Sequence):
             # Transform the bounding boxes in the annotations.
             annotations['bboxes'] = annotations['bboxes'].copy()
             for index in range(annotations['bboxes'].shape[0]):
-                annotations['bboxes'][index, :] = transform_aabb(transform, annotations['bboxes'][index, :])
+                annotations['bboxes'][index, :] = transform_aabb(transform, annotations['bboxes'][index, :]) """
 
         return image, annotations
 
