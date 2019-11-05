@@ -142,7 +142,7 @@ class FilterDetections(keras.layers.Layer):
         score_threshold       = 0.05,
         max_detections        = 300,
         parallel_iterations   = 32,
-        num_coordinates       = 8,
+        num_coordinates       = 4,
         **kwargs
     ):
         """ Filters detections using score threshold, NMS and selecting the top-k detections.
