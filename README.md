@@ -1,3 +1,11 @@
+# gitteric's fork notes!
+
+This is a fork of keras-retinanet that allow you to train a neural net that learns shapes beyond just rectangular bounding boxes.  See [this blog article](https://letsmakeit.com/?p=266) for an example of finding regression quadrilaterals instead.  The only change to the original repo is a new `--points=4` command line argument that allows you to specify the number of points to find, defaulting to the regular 4 (x1, y1, x2, y2) bounding box points.  
+
+Gotchas: Only bin/train.py has been updated to support arbitrary numbers of points, unit tests and other bin scripts have not been updated and only support bounding boxes.
+
+The remainder of this readme is the original repo documentation.
+
 # Keras RetinaNet [![Build Status](https://travis-ci.org/fizyr/keras-retinanet.svg?branch=master)](https://travis-ci.org/fizyr/keras-retinanet) [![DOI](https://zenodo.org/badge/100249425.svg)](https://zenodo.org/badge/latestdoi/100249425)
 
 Keras implementation of RetinaNet object detection as described in [Focal Loss for Dense Object Detection](https://arxiv.org/abs/1708.02002)
