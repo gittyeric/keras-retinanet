@@ -79,13 +79,16 @@ def anchor_targets_bbox(
 
     assert(len(image_group) == len(annotations_group)), "The length of the images and annotations need to be equal."
     assert(len(annotations_group) > 0), "No data received to compute anchor targets for."
+    num_coordinates = 0
+
     for annotations in annotations_group:
+        num_coordinates = len(annotations['bboxes'][0])
         assert('bboxes' in annotations), "Annotations should contain bboxes."
         assert('labels' in annotations), "Annotations should contain labels."
 
     batch_size = len(image_group)
 
-    regression_batch  = np.zeros((batch_size, anchors.shape[0], 4 + 1), dtype=keras.backend.floatx())
+    regression_batch  = np.zeros((batch_size, anchors.shape[0], num_coordinates + 1), dtype=keras.backend.floatx())
     labels_batch      = np.zeros((batch_size, anchors.shape[0], num_classes + 1), dtype=keras.backend.floatx())
 
     # compute labels and regression targets
@@ -106,15 +109,40 @@ def anchor_targets_bbox(
             regression_batch[index, :, :-1] = bbox_transform(anchors, annotations['bboxes'][argmax_overlaps_inds, :])
 
         # ignore annotations outside of image
-        if image.shape:
+        """if image.shape:
             anchors_centers = np.vstack([(anchors[:, 0] + anchors[:, 2]) / 2, (anchors[:, 1] + anchors[:, 3]) / 2]).T
             indices = np.logical_or(anchors_centers[:, 0] >= image.shape[1], anchors_centers[:, 1] >= image.shape[0])
 
             labels_batch[index, indices, -1]     = -1
-            regression_batch[index, indices, -1] = -1
+            regression_batch[index, indices, -1] = -1"""
+
+    num_pos = 0
+    for i in range(0, len(regression_batch[0])):
+        if regression_batch[0][i][-1] == 1:
+            num_pos += 1
+
+    max_anchor_area = 0
+    for anchor in anchors:
+        max_anchor_area = max(max_anchor_area, (anchor[2] - anchor[0]) * (anchor[3] - anchor[1]))
 
     return regression_batch, labels_batch
 
+
+def polygon_to_bounding_box(polygon):
+    min_x = polygon[0]
+    min_y = polygon[1]
+    max_x = polygon[0]
+    max_y = polygon[1]
+
+    for i in range(0, len(polygon)):
+        if i % 2 == 0:
+            min_x = min(min_x, polygon[i])
+            max_x = max(max_x, polygon[i])
+        else:
+            min_y = min(min_y, polygon[i])
+            max_y = max(max_y, polygon[i])
+
+    return np.array([min_x, min_y, max_x, max_y])
 
 def compute_gt_annotations(
     anchors,
@@ -126,7 +154,7 @@ def compute_gt_annotations(
 
     Args
         anchors: np.array of annotations of shape (N, 4) for (x1, y1, x2, y2).
-        annotations: np.array of shape (N, 5) for (x1, y1, x2, y2, label).
+        annotations: np.array of shape (N, num_coordinates+1) for (x1, y1, x2, y2, ..., label).
         negative_overlap: IoU overlap for negative anchors (all anchors with overlap < negative_overlap are negative).
         positive_overlap: IoU overlap or positive anchors (all anchors with overlap > positive_overlap are positive).
 
@@ -136,7 +164,11 @@ def compute_gt_annotations(
         argmax_overlaps_inds: ordered overlaps indices
     """
 
-    overlaps = compute_overlap(anchors.astype(np.float64), annotations.astype(np.float64))
+    num_coordinates = len(annotations[0])
+    # For num_coordinates != 4, approximate overlap by finding the minimum bounding box
+    bounded_annotations = np.array([polygon_to_bounding_box(polygon) for polygon in annotations])
+
+    overlaps = compute_overlap(anchors.astype(np.float64), bounded_annotations.astype(np.float64))
     argmax_overlaps_inds = np.argmax(overlaps, axis=1)
     max_overlaps = overlaps[np.arange(overlaps.shape[0]), argmax_overlaps_inds]
 
@@ -309,10 +341,11 @@ def generate_anchors(base_size=16, ratios=None, scales=None):
 def bbox_transform(anchors, gt_boxes, mean=None, std=None):
     """Compute bounding-box regression targets for an image."""
 
+    num_coordinates = len(gt_boxes[0])
     if mean is None:
-        mean = np.array([0, 0, 0, 0])
+        mean = np.array([0] * num_coordinates)
     if std is None:
-        std = np.array([0.2, 0.2, 0.2, 0.2])
+        std = np.array([0.2] * num_coordinates)
 
     if isinstance(mean, (list, tuple)):
         mean = np.array(mean)
@@ -327,12 +360,19 @@ def bbox_transform(anchors, gt_boxes, mean=None, std=None):
     anchor_widths  = anchors[:, 2] - anchors[:, 0]
     anchor_heights = anchors[:, 3] - anchors[:, 1]
 
-    targets_dx1 = (gt_boxes[:, 0] - anchors[:, 0]) / anchor_widths
+    target_coordinates = []
+    for i in range(0, num_coordinates):
+        if i % 2 == 0:
+            target_coordinates.append((gt_boxes[:, i] - anchors[:, 0]) / anchor_widths)
+        else:
+            target_coordinates.append((gt_boxes[:, i] - anchors[:, 1]) / anchor_heights)
+
+    """targets_dx1 = (gt_boxes[:, 0] - anchors[:, 0]) / anchor_widths
     targets_dy1 = (gt_boxes[:, 1] - anchors[:, 1]) / anchor_heights
     targets_dx2 = (gt_boxes[:, 2] - anchors[:, 2]) / anchor_widths
-    targets_dy2 = (gt_boxes[:, 3] - anchors[:, 3]) / anchor_heights
+    targets_dy2 = (gt_boxes[:, 3] - anchors[:, 3]) / anchor_heights"""
 
-    targets = np.stack((targets_dx1, targets_dy1, targets_dx2, targets_dy2))
+    targets = np.stack(target_coordinates)
     targets = targets.T
 
     targets = (targets - mean) / std

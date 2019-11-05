@@ -18,7 +18,7 @@ import keras.backend
 from .dynamic import meshgrid
 
 
-def bbox_transform_inv(boxes, deltas, mean=None, std=None):
+def bbox_transform_inv(boxes, deltas, mean=None, std=None, num_coordinates=4):
     """ Applies deltas (usually regression results) to boxes (usually anchors).
 
     Before applying the deltas to the boxes, the normalization that was previously applied (in the generator) has to be removed.
@@ -34,7 +34,6 @@ def bbox_transform_inv(boxes, deltas, mean=None, std=None):
         A np.array of the same shape as boxes, but with deltas applied to each box.
         The mean and std are used during training to normalize the regression values (networks love normalization).
     """
-    num_coordinates = 4  #len(deltas)
     if mean is None:
         mean = [0] * num_coordinates
     if std is None:

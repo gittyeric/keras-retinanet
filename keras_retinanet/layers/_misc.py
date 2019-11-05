@@ -143,11 +143,12 @@ class RegressBoxes(keras.layers.Layer):
 
         self.mean = mean
         self.std  = std
+        self.num_coordinates = num_coordinates
         super(RegressBoxes, self).__init__(*args, **kwargs)
 
     def call(self, inputs, **kwargs):
         anchors, regression = inputs
-        return backend.bbox_transform_inv(anchors, regression, mean=self.mean, std=self.std)
+        return backend.bbox_transform_inv(anchors, regression, mean=self.mean, std=self.std, num_coordinates=self.num_coordinates)
 
     def compute_output_shape(self, input_shape):
         return input_shape[0]

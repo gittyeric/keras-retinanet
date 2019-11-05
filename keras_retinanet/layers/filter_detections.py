@@ -16,6 +16,20 @@ limitations under the License.
 
 import keras
 from .. import backend
+import numpy as np
+
+def get_bounding_box(shape):
+    num_coords = shape.shape.dims[0].value
+    even_indicies = [i for i in range(0, num_coords, 2)]
+    odd_indicies = [i for i in range(1, num_coords, 2)]
+
+    x_coords = keras.backend.gather(shape, even_indicies)
+    y_coords = keras.backend.gather(shape, odd_indicies)
+    min_x = keras.backend.min(x_coords)
+    max_x = keras.backend.max(x_coords)
+    min_y = keras.backend.min(y_coords)
+    max_y = keras.backend.max(y_coords)
+    return keras.backend.stack((min_x, min_y, max_x, max_y))
 
 
 def filter_detections(
@@ -31,7 +45,7 @@ def filter_detections(
     """ Filter detections using the boxes and classification values.
 
     Args
-        boxes                 : Tensor of shape (num_boxes, 4) containing the boxes in (x1, y1, x2, y2) format.
+        boxes                 : Tensor of shape (num_boxes, 2n) containing the boxes in (x1, y1, x2, y2...) format.
         classification        : Tensor of shape (num_boxes, num_classes) containing the classification scores.
         other                 : List of tensors of shape (num_boxes, ...) to filter along with the boxes and classification scores.
         class_specific_filter : Whether to perform filtering per class, or take the best scoring class and filter those.
@@ -42,7 +56,7 @@ def filter_detections(
 
     Returns
         A list of [boxes, scores, labels, other[0], other[1], ...].
-        boxes is shaped (max_detections, 4) and contains the (x1, y1, x2, y2) of the non-suppressed boxes.
+        boxes is shaped (max_detections, 2n) and contains the (x1, y1, x2, y2...) of the non-suppressed boxes.
         scores is shaped (max_detections,) and contains the scores of the predicted class.
         labels is shaped (max_detections,) and contains the predicted label.
         other[i] is shaped (max_detections, ...) and contains the filtered other[i] data.
@@ -53,10 +67,13 @@ def filter_detections(
         indices = backend.where(keras.backend.greater(scores, score_threshold))
 
         if nms:
-            filtered_boxes  = backend.gather_nd(boxes, indices)
+            filtered_shapes  = backend.gather_nd(boxes, indices)
             filtered_scores = keras.backend.gather(scores, indices)[:, 0]
 
             # perform NMS
+
+            #If filtered_boxes has more than 2 points, find the minimum bounding boxes and use those instead
+            filtered_boxes = backend.map_fn(get_bounding_box, filtered_shapes)
             nms_indices = backend.non_max_suppression(filtered_boxes, filtered_scores, max_output_size=max_detections, iou_threshold=nms_threshold)
 
             # filter indices based on NMS
@@ -103,7 +120,8 @@ def filter_detections(
     other_   = [backend.pad(o, [[0, pad_size]] + [[0, 0] for _ in range(1, len(o.shape))], constant_values=-1) for o in other_]
 
     # set shapes, since we know what they are
-    boxes.set_shape([max_detections, 4])
+    num_coords = boxes.shape.dims[1].value
+    boxes.set_shape([max_detections, num_coords])
     scores.set_shape([max_detections])
     labels.set_shape([max_detections])
     for o, s in zip(other_, [list(keras.backend.int_shape(o)) for o in other]):
@@ -124,6 +142,7 @@ class FilterDetections(keras.layers.Layer):
         score_threshold       = 0.05,
         max_detections        = 300,
         parallel_iterations   = 32,
+        num_coordinates       = 4,
         **kwargs
     ):
         """ Filters detections using score threshold, NMS and selecting the top-k detections.
@@ -135,6 +154,7 @@ class FilterDetections(keras.layers.Layer):
             score_threshold       : Threshold used to prefilter the boxes with.
             max_detections        : Maximum number of detections to keep.
             parallel_iterations   : Number of batch items to process in parallel.
+            num_coordinates       : Number of coordinates in boxes
         """
         self.nms                   = nms
         self.class_specific_filter = class_specific_filter
@@ -142,6 +162,7 @@ class FilterDetections(keras.layers.Layer):
         self.score_threshold       = score_threshold
         self.max_detections        = max_detections
         self.parallel_iterations   = parallel_iterations
+        self.num_coordinates       = num_coordinates
         super(FilterDetections, self).__init__(**kwargs)
 
     def call(self, inputs, **kwargs):
@@ -192,7 +213,7 @@ class FilterDetections(keras.layers.Layer):
             [filtered_boxes.shape, filtered_scores.shape, filtered_labels.shape, filtered_other[0].shape, filtered_other[1].shape, ...]
         """
         return [
-            (input_shape[0][0], self.max_detections, 4),
+            (input_shape[0][0], self.max_detections, self.num_coordinates),
             (input_shape[1][0], self.max_detections),
             (input_shape[1][0], self.max_detections),
         ] + [
@@ -218,6 +239,7 @@ class FilterDetections(keras.layers.Layer):
             'score_threshold'       : self.score_threshold,
             'max_detections'        : self.max_detections,
             'parallel_iterations'   : self.parallel_iterations,
+            'num_coordinates': self.num_coordinates,
         })
 
         return config

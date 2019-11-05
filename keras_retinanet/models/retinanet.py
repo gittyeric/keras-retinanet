@@ -321,6 +321,8 @@ def retinanet_bbox(
         ```
     """
 
+    print("Creating retinanet with " + str(num_regression_values) + " regression value outputs")
+
     # if no anchor parameters are passed, use default values
     if anchor_params is None:
         anchor_params = AnchorParameters.default
@@ -343,7 +345,7 @@ def retinanet_bbox(
     other = model.outputs[2:]
 
     # apply predicted regression to anchors
-    boxes = layers.RegressBoxes(name='boxes')([anchors, regression])
+    boxes = layers.RegressBoxes(name='boxes', num_coordinates=num_regression_values)([anchors, regression])
     # For this particular application, don't clip points outside of anchor boxes
     #boxes = layers.ClipBoxes(name='clipped_boxes')([model.inputs[0], boxes])
 
@@ -351,7 +353,8 @@ def retinanet_bbox(
     detections = layers.FilterDetections(
         nms                   = nms,
         class_specific_filter = class_specific_filter,
-        name                  = 'filtered_detections'
+        name                  = 'filtered_detections',
+        num_coordinates       = num_regression_values
     )([boxes, classification] + other)
 
     # construct the model
